@@ -1,12 +1,16 @@
 [target.xtensa-esp32s2-none-elf]
 runner = "espflash --monitor"
 
+[target.esp32s2-atomic]
+runner = "espflash --monitor"
+
 [build]
 rustflags = [
   "-C", "link-arg=-nostartfiles",
   "-C", "link-arg=-Wl,-Tlinkall.x",
+  "-C", "default-linker-libraries"
 ]
-target = "xtensa-esp32s2-none-elf"
+target = "esp32s2-atomic"
 
 [unstable]
 build-std = ["core"]
