@@ -4,11 +4,12 @@
     "data-layout": "e-m:e-p:32:32-i8:8:32-i16:16:32-i64:64-n32",
     "emit-debug-gdb-scripts": false,
     "executables": true,
-    "features":"+s32c1i",
+    "features": "+s32c1i",
     "linker": "xtensa-esp32s2-elf-gcc",
     "llvm-target": "xtensa-none-elf",
     "panic-strategy": "abort",
     "relocation-model": "static",
     "target-pointer-width": "32",
+    "max-atomic-width": 32,
     "vendor": ""
 }

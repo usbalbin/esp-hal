@@ -30,8 +30,47 @@ fn main() -> ! {
         writeln!(serial0, "Hello world!").unwrap();
         block!(timer0.wait()).unwrap();
 
-        writeln!(serial0, "About to trigger exception").unwrap();
-        let x = 4;
-        unsafe { core::arch::asm!("wsr {}, SCOMPARE1", in(reg) x) };
+        use core::sync::atomic::AtomicUsize;
+        let x = AtomicUsize::new(0);
+
+        let old = x.compare_and_swap(0, 12, core::sync::atomic::Ordering::Release);
+
+        writeln!(serial0, "Old: {}", old).unwrap();
+
+        writeln!(
+            serial0,
+            "Current: {}",
+            x.load(core::sync::atomic::Ordering::SeqCst)
+        )
+        .unwrap();
+
+        let old = x.compare_and_swap(12, 13, core::sync::atomic::Ordering::Release);
+
+        writeln!(serial0, "Old2: {}", old).unwrap();
+
+        writeln!(
+            serial0,
+            "Current2: {}",
+            x.load(core::sync::atomic::Ordering::SeqCst)
+        )
+        .unwrap();
+
+        writeln!(serial0).ok();
+    }
+}
+
+extern "C" {
+    fn uart_tx_one_char(c: u8);
+}
+
+struct Uart;
+
+impl core::fmt::Write for Uart {
+    fn write_str(&mut self, s: &str) -> core::fmt::Result {
+        s.as_bytes()
+            .iter()
+            .for_each(|&c| unsafe { uart_tx_one_char(c) });
+
+        Ok(())
     }
 }
