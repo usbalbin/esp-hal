@@ -7,7 +7,10 @@ use core::fmt::Write;
 use esp32s2_hal::{pac::Peripherals, prelude::*, RtcCntl, Serial, Timer};
 use nb::block;
 use panic_halt as _;
+// TODO why do I need extern crate too?
 use xtensa_atomic_emulation_trap as _;
+extern crate xtensa_atomic_emulation_trap;
+
 use xtensa_lx_rt::entry;
 
 #[entry]
@@ -23,8 +26,6 @@ fn main() -> ! {
     rtc_cntl.set_wdt_global_enable(false);
 
     timer0.start(40_000_000u64);
-
-    xtensa_atomic_emulation_trap::test_print();
 
     loop {
         writeln!(serial0, "Hello world!").unwrap();
@@ -56,21 +57,5 @@ fn main() -> ! {
         .unwrap();
 
         writeln!(serial0).ok();
-    }
-}
-
-extern "C" {
-    fn uart_tx_one_char(c: u8);
-}
-
-struct Uart;
-
-impl core::fmt::Write for Uart {
-    fn write_str(&mut self, s: &str) -> core::fmt::Result {
-        s.as_bytes()
-            .iter()
-            .for_each(|&c| unsafe { uart_tx_one_char(c) });
-
-        Ok(())
     }
 }
