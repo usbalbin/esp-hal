@@ -6,3 +6,12 @@ members = [
     "esp32s2-hal",
     "esp32s3-hal"
 ]
+
+[patch.crates-io]
+xtensa-lx-rt = { version = "0.11", path = "/home/mabez/development/rust/embedded/projects/xtensa-lx-rt", features = ["esp32s2"] }
+
+[profile.dev.package.xtensa-atomic-emulation-trap]
+opt-level = 'z'
+
+[profile.dev.package.xtensa-lx-rt]
+opt-level = 'z'
