@@ -28,6 +28,8 @@ pub use esp32s2_pac as pac;
 pub use esp32s3_pac as pac;
 
 pub mod delay;
+#[cfg(feature = "risc_v")]
+pub mod embassy;
 pub mod gpio;
 pub mod i2c;
 #[cfg_attr(feature = "risc_v", path = "interrupt/riscv.rs")]

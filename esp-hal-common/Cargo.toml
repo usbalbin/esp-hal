@@ -33,6 +33,8 @@ ufmt-write = { version = "0.1", optional = true }
 # Smart-LED (e.g., WS2812/SK68XX) support
 smart-leds-trait = { version = "0.2.1", optional = true }
 
+# embassy
+embassy = { path = "/home/mabez/development/rust/embedded/util/embassy/embassy", features = ["time", "time-tick-16mhz"] }
 
 # IMPORTANT:
 # Each supported device MUST have its PAC included below along with a

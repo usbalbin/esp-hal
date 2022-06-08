@@ -50,6 +50,7 @@ pub enum InterruptKind {
 /// Enumeration of available CPU interrupts.
 /// It is possible to create a handler for each of the interrupts. (e.g.
 /// `interrupt3`)
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum CpuInterrupt {
     Interrupt1 = 1,
     Interrupt2,
@@ -85,6 +86,8 @@ pub enum CpuInterrupt {
 }
 
 /// Interrupt priority levels.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[repr(u8)]
 pub enum Priority {
     None,
     Priority1,
