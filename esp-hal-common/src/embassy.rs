@@ -126,6 +126,17 @@ macro_rules! embassy_interrupt {
 // TODO this needs to be a proc macro that can take dynamic input from the user
 embassy_interrupt!((GpioInterrupt, GPIO, Interrupt1, "__ESP_HAL_GPIOINTERRUPT"));
 
+pub fn init() -> Peripherals {
+    // Do this first, so that it panics if user is calling `init` a second time
+    // before doing anything important.
+    let peripherals = Peripherals::take().unwrap();
+
+    // TODO implement the system timer
+    // TODO initialize it here
+
+    peripherals
+}
+
 mod esp32c3_interrupt_controller {
     use super::*;
     // esp32c3 specific items to be generalised one day
