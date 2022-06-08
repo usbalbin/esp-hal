@@ -5,7 +5,7 @@ use core::{
 
 use embassy::interrupt::{Interrupt, InterruptExt};
 
-use crate::{disable, enable, set_priority, Cpu, CpuInterrupt, Priority};
+use crate::{disable, enable, pac::Peripherals, set_priority, Cpu, CpuInterrupt, Priority};
 
 pub unsafe trait PeripheralInterrupt {
     fn peripheral_number(&self) -> u16;
@@ -123,25 +123,11 @@ macro_rules! embassy_interrupt {
     };
 }
 
-// TODO this needs to be a proc macro that can take dynamic input
+// TODO this needs to be a proc macro that can take dynamic input from the user
 embassy_interrupt!((GpioInterrupt, GPIO, Interrupt1, "__ESP_HAL_GPIOINTERRUPT"));
-
-impl From<u8> for Priority {
-    fn from(p: u8) -> Self {
-        p.into()
-    }
-}
-
-impl Into<u8> for Priority {
-    fn into(self) -> u8 {
-        self as _
-    }
-}
 
 mod esp32c3_interrupt_controller {
     use super::*;
-    use crate::clear;
-
     // esp32c3 specific items to be generalised one day
 
     pub fn is_pending(cpu_interrupt_number: CpuInterrupt) -> bool {
@@ -177,28 +163,33 @@ mod esp32c3_interrupt_controller {
     }
 
     pub fn pend(_interrupt: crate::pac::Interrupt) {
+        todo!("pend impl needed")
         // unsafe {
-        // TODO set the interrupt pending in the status some how
-        todo!();
-        // possible workaround, store pending interrupt in atomic global
-        // catch the software interrupt and check the global?
+        //     // TODO set the interrupt pending in the status some how
+        //     // todo!();
+        //     // possible workaround, store pending interrupt in atomic global
+        //     // catch the software interrupt and check the global?
 
-        // trigger an interrupt via the software interrupt mechanism
-        // let system = &*crate::pac::SYSTEM::ptr();
-        // system
-        //     .cpu_intr_from_cpu_0
-        //     .modify(|_, w| w.cpu_intr_from_cpu_0().set_bit());
+        //     SOFT_PEND = Some(interrupt); // TODO what if this is some
+        // already?
+
+        //     // trigger an interrupt via the software interrupt mechanism
+        //     let system = &*crate::pac::SYSTEM::ptr();
+        //     system
+        //         .cpu_intr_from_cpu_0
+        //         .modify(|_, w| w.cpu_intr_from_cpu_0().set_bit());
         // }
     }
 
-    pub fn unpend(_interrupt: crate::pac::Interrupt, cpu: CpuInterrupt) {
-        unsafe {
-            // unpend an awaiting software interrupt
-            let system = &*crate::pac::SYSTEM::ptr();
-            system
-                .cpu_intr_from_cpu_0
-                .modify(|_, w| w.cpu_intr_from_cpu_0().clear_bit());
-            clear(Cpu::ProCpu, cpu)
-        }
+    pub fn unpend(_interrupt: crate::pac::Interrupt, _cpu: CpuInterrupt) {
+        // unsafe {
+        //     // unpend an awaiting software interrupt
+        //     let system = &*crate::pac::SYSTEM::ptr();
+        //     system
+        //         .cpu_intr_from_cpu_0
+        //         .modify(|_, w| w.cpu_intr_from_cpu_0().clear_bit());
+        //     clear(Cpu::ProCpu, cpu)
+        // }
+        todo!("unpend impl needed")
     }
 }

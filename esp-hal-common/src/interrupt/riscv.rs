@@ -107,6 +107,18 @@ pub enum Priority {
     Priority15,
 }
 
+impl From<u8> for Priority {
+    fn from(p: u8) -> Self {
+        p.into()
+    }
+}
+
+impl Into<u8> for Priority {
+    fn into(self) -> u8 {
+        self as _
+    }
+}
+
 /// Enable and assign a peripheral interrupt to an CPU interrupt.
 pub fn enable(_core: Cpu, interrupt: Interrupt, which: CpuInterrupt) {
     unsafe {
