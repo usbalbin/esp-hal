@@ -5,24 +5,28 @@ use core::{
 
 use embassy::interrupt::{Interrupt, InterruptExt};
 
-use crate::{interrupt, CpuInterrupt, Priority};
+use crate::{disable, enable, set_priority, Cpu, CpuInterrupt, Priority};
+
+pub unsafe trait PeripheralInterrupt {
+    fn peripheral_number(&self) -> u16;
+}
 
 macro_rules! embassy_interrupt {
     (
-        $(($struct:ident, $cpu:ident, $handler:tt)),*
+        $(($struct:ident, $interrupt:ident, $cpu:ident, $handler:tt)),*
     ) => {
         $(
-        pub struct $struct(CpuInterrupt);
+        pub struct $struct(crate::pac::Interrupt, CpuInterrupt);
 
         unsafe impl Interrupt for $struct {
             type Priority = Priority;
 
             fn number(&self) -> u16 {
-                self.0 as _
+                self.1 as _
             }
 
             unsafe fn steal() -> Self {
-                $struct(CpuInterrupt::$cpu)
+                $struct(crate::pac::Interrupt::$interrupt, CpuInterrupt::$cpu)
             }
 
             unsafe fn __handler(&self) -> &'static embassy::interrupt::Handler {
@@ -32,34 +36,95 @@ macro_rules! embassy_interrupt {
             }
         }
 
+        unsafe impl PeripheralInterrupt for $struct {
+            fn peripheral_number(&self) -> u16 {
+                self.0 as _
+            }
+        }
+
         unsafe impl ::embassy::util::Unborrow for $struct {
             type Target = $struct;
             unsafe fn unborrow(self) -> $struct {
                 self
             }
         }
+
+        impl InterruptExt for $struct {
+            fn set_handler(&self, func: unsafe fn(*mut ())) {
+                compiler_fence(Ordering::SeqCst);
+                let handler = unsafe { self.__handler() };
+                handler.func.store(func as *mut (), Ordering::Relaxed);
+                compiler_fence(Ordering::SeqCst);
+            }
+
+            fn remove_handler(&self) {
+                compiler_fence(Ordering::SeqCst);
+                let handler = unsafe { self.__handler() };
+                handler.func.store(ptr::null_mut(), Ordering::Relaxed);
+                compiler_fence(Ordering::SeqCst);
+            }
+
+            fn set_handler_context(&self, ctx: *mut ()) {
+                let handler = unsafe { self.__handler() };
+                handler.ctx.store(ctx, Ordering::Relaxed);
+            }
+
+            fn enable(&self) {
+                compiler_fence(Ordering::SeqCst);
+                let s = unsafe { Self::steal() };
+                enable(
+                    Cpu::ProCpu, // TODO remove hardcode
+                    s.0,
+                    s.1,
+                );
+            }
+
+            fn disable(&self) {
+                let s = unsafe { Self::steal() };
+                disable(
+                    Cpu::ProCpu, // TODO remove hardcode
+                    s.0,
+                );
+                compiler_fence(Ordering::SeqCst);
+            }
+
+            fn is_active(&self) -> bool {
+                let cause = riscv::register::mcause::read().cause();
+                matches!(cause, riscv::register::mcause::Trap::Interrupt(_))
+            }
+
+            fn is_enabled(&self) -> bool {
+                // TODO check that peripheral interrupt is installed at cpu slot
+                esp32c3_interrupt_controller::is_enabled(self.1)
+            }
+
+            fn is_pending(&self) -> bool {
+                esp32c3_interrupt_controller::is_pending(self.1)
+            }
+
+            fn pend(&self) {
+                esp32c3_interrupt_controller::pend(self.0)
+            }
+
+            fn unpend(&self) {
+                esp32c3_interrupt_controller::unpend(self.0, self.1)
+            }
+
+            fn get_priority(&self) -> Self::Priority {
+                esp32c3_interrupt_controller::get_priority(self.1)
+            }
+
+            fn set_priority(&self, prio: Self::Priority) {
+                let s = unsafe { Self::steal() };
+                set_priority(Cpu::ProCpu, s.1, prio)
+            }
+        }
         )+
     };
 }
 
-// Macro based on `interrupt_declare` in embassy
-// TODO the rest
-// TODO this does not bind a cpu interrupt to a peripheral
-embassy_interrupt!(
-    (EmbassyInterrupt1, Interrupt1, "EMBASSYINTERRUPT1"),
-    (EmbassyInterrupt2, Interrupt2, "EMBASSYINTERRUPT2"),
-    (EmbassyInterrupt3, Interrupt3, "EMBASSYINTERRUPT3"),
-    (EmbassyInterrupt4, Interrupt4, "EMBASSYINTERRUPT4"),
-    (EmbassyInterrupt5, Interrupt5, "EMBASSYINTERRUPT5"),
-    (EmbassyInterrupt6, Interrupt6, "EMBASSYINTERRUPT6"),
-    (EmbassyInterrupt7, Interrupt7, "EMBASSYINTERRUPT7"),
-    (EmbassyInterrupt8, Interrupt8, "EMBASSYINTERRUPT8"),
-    (EmbassyInterrupt9, Interrupt9, "EMBASSYINTERRUPT9"),
-    (EmbassyInterrupt10, Interrupt10, "EMBASSYINTERRUPT10"),
-    (EmbassyInterrupt11, Interrupt11, "EMBASSYINTERRUPT11"),
-    (EmbassyInterrupt12, Interrupt12, "EMBASSYINTERRUPT12"),
-    (EmbassyInterrupt13, Interrupt13, "EMBASSYINTERRUPT13")
-);
+// TODO this needs to be a proc macro that can take dynamic input
+embassy_interrupt!((GpioInterrupt, GPIO, Interrupt1, "__ESP_HAL_GPIOINTERRUPT"));
 
 impl From<u8> for Priority {
     fn from(p: u8) -> Self {
@@ -73,60 +138,67 @@ impl Into<u8> for Priority {
     }
 }
 
-impl<T: Interrupt + ?Sized> InterruptExt for T {
-    fn set_handler(&self, func: unsafe fn(*mut ())) {
-        compiler_fence(Ordering::SeqCst);
-        let handler = unsafe { self.__handler() };
-        handler.func.store(func as *mut (), Ordering::Relaxed);
-        compiler_fence(Ordering::SeqCst);
+mod esp32c3_interrupt_controller {
+    use super::*;
+    use crate::clear;
+
+    // esp32c3 specific items to be generalised one day
+
+    pub fn is_pending(cpu_interrupt_number: CpuInterrupt) -> bool {
+        unsafe {
+            let intr = &*crate::pac::INTERRUPT_CORE0::ptr();
+            let b = intr.cpu_int_eip_status.read().bits();
+            let ans = b & (1 << cpu_interrupt_number as isize);
+            ans != 0
+        }
     }
 
-    fn remove_handler(&self) {
-        compiler_fence(Ordering::SeqCst);
-        let handler = unsafe { self.__handler() };
-        handler.func.store(ptr::null_mut(), Ordering::Relaxed);
-        compiler_fence(Ordering::SeqCst);
+    pub fn get_priority(which: CpuInterrupt) -> Priority {
+        unsafe {
+            let intr = &*crate::pac::INTERRUPT_CORE0::ptr();
+            let cpu_interrupt_number = which as isize;
+            let intr_prio_base = intr.cpu_int_pri_0.as_ptr();
+
+            let prio = intr_prio_base
+                .offset(cpu_interrupt_number as isize)
+                .read_volatile();
+
+            (prio as u8).into()
+        }
     }
 
-    fn set_handler_context(&self, ctx: *mut ()) {
-        let handler = unsafe { self.__handler() };
-        handler.ctx.store(ctx, Ordering::Relaxed);
+    pub fn is_enabled(cpu_interrupt_number: CpuInterrupt) -> bool {
+        unsafe {
+            let intr = &*crate::pac::INTERRUPT_CORE0::ptr();
+            let b = intr.cpu_int_enable.read().bits();
+            let ans = b & (1 << cpu_interrupt_number as isize);
+            ans != 0
+        }
     }
 
-    fn enable(&self) {
-        compiler_fence(Ordering::SeqCst);
-        todo!()
+    pub fn pend(_interrupt: crate::pac::Interrupt) {
+        // unsafe {
+        // TODO set the interrupt pending in the status some how
+        todo!();
+        // possible workaround, store pending interrupt in atomic global
+        // catch the software interrupt and check the global?
+
+        // trigger an interrupt via the software interrupt mechanism
+        // let system = &*crate::pac::SYSTEM::ptr();
+        // system
+        //     .cpu_intr_from_cpu_0
+        //     .modify(|_, w| w.cpu_intr_from_cpu_0().set_bit());
+        // }
     }
 
-    fn disable(&self) {
-        todo!()
-    }
-
-    fn is_active(&self) -> bool {
-        todo!()
-    }
-
-    fn is_enabled(&self) -> bool {
-        todo!()
-    }
-
-    fn is_pending(&self) -> bool {
-        todo!()
-    }
-
-    fn pend(&self) {
-        todo!()
-    }
-
-    fn unpend(&self) {
-        todo!()
-    }
-
-    fn get_priority(&self) -> Self::Priority {
-        todo!()
-    }
-
-    fn set_priority(&self, prio: Self::Priority) {
-        todo!()
+    pub fn unpend(_interrupt: crate::pac::Interrupt, cpu: CpuInterrupt) {
+        unsafe {
+            // unpend an awaiting software interrupt
+            let system = &*crate::pac::SYSTEM::ptr();
+            system
+                .cpu_intr_from_cpu_0
+                .modify(|_, w| w.cpu_intr_from_cpu_0().clear_bit());
+            clear(Cpu::ProCpu, cpu)
+        }
     }
 }
