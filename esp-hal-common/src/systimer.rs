@@ -23,6 +23,8 @@ pub struct SystemTimer {
 }
 
 impl SystemTimer {
+    pub const BIT_MASK: u64 = 0xFFFFFFFFFFFFF;
+
     pub fn new(p: SYSTIMER) -> Self {
         Self {
             _inner: p,
@@ -160,5 +162,21 @@ impl<const CHANNEL: u8> Alarm<Target, CHANNEL> {
                 _ => unreachable!(),
             });
         }
+    }
+
+    pub fn target_met(&self) -> bool {
+        let systimer = unsafe { &*SYSTIMER::ptr() };
+        match CHANNEL {
+            0 => systimer.int_st.read().target0_int_st().bit_is_set(),
+            1 => systimer.int_st.read().target1_int_st().bit_is_set(),
+            2 => systimer.int_st.read().target2_int_st().bit_is_set(),
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn wait(&self) {
+        self.enable_interrupt();
+        while !self.target_met() {}
+        self.clear_interrupt();
     }
 }
