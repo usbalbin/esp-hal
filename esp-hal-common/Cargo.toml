@@ -35,6 +35,8 @@ smart-leds-trait = { version = "0.2.1", optional = true }
 
 # embassy
 embassy = { path = "/home/mabez/development/rust/embedded/util/embassy/embassy", features = ["time", "time-tick-16mhz"] }
+critical-section = "0.2.7"
+esp-println = { git = "https://github.com/esp-rs/esp-println", features = ["esp32c3"]}
 
 # IMPORTANT:
 # Each supported device MUST have its PAC included below along with a

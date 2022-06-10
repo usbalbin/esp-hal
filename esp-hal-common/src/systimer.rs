@@ -173,3 +173,21 @@ impl<const CHANNEL: u8> Alarm<Target, CHANNEL> {
         }
     }
 }
+
+impl<T> Alarm<T, 0> {
+    pub const unsafe fn conjure() -> Self {
+        Self { _pd: PhantomData }
+    }
+}
+
+impl<T> Alarm<T, 1> {
+    pub const unsafe fn conjure() -> Self {
+        Self { _pd: PhantomData }
+    }
+}
+
+impl<T> Alarm<T, 2> {
+    pub const unsafe fn conjure() -> Self {
+        Self { _pd: PhantomData }
+    }
+}
