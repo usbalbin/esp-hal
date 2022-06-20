@@ -28,7 +28,7 @@ pub use esp32s2_pac as pac;
 pub use esp32s3_pac as pac;
 
 pub mod delay;
-#[cfg(feature = "risc_v")]
+#[cfg(any(feature = "esp32c3", feature = "esp32s3"))]
 pub mod embassy;
 pub mod gpio;
 pub mod i2c;

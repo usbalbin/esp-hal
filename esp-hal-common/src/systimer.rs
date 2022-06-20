@@ -129,9 +129,12 @@ impl<const CHANNEL: u8> Alarm<Target, CHANNEL> {
             #[cfg(any(feature = "esp32c3", feature = "esp32s3"))]
             {
                 tconf.write(|w| w.target0_timer_unit_sel().clear_bit()); // default, use unit 0
-                systimer
-                    .conf
-                    .modify(|_, w| w.timer_unit0_core0_stall_en().clear_bit());
+                systimer.conf.modify(|_, w| {
+                    w.timer_unit0_core0_stall_en()
+                        .clear_bit()
+                        .timer_unit0_core1_stall_en()
+                        .clear_bit()
+                });
             }
 
             tconf.write(|w| w.target0_period_mode().clear_bit()); // target mode
