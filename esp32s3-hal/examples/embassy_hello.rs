@@ -1,7 +1,7 @@
 #![no_std]
 #![no_main]
 #![feature(type_alias_impl_trait)]
-
+#![feature(asm_experimental_arch)]
 
 use embassy::{
     self,
@@ -60,14 +60,15 @@ fn main() -> ! {
 struct CriticalSection;
 critical_section::custom_impl!(CriticalSection);
 
+static mut VPS: u32 = 0;
+// TODO this is **NOT** multicore safe
 unsafe impl critical_section::Impl for CriticalSection {
     unsafe fn acquire() -> u8 {
-        return xtensa_lx::interrupt::disable() as _;
+        core::arch::asm!("rsil {0}, 15", out(reg) VPS);
+        0
     }
 
-    unsafe fn release(token: u8) {
-        if token != 0 {
-            xtensa_lx::interrupt::enable_mask(ENABLE_MASK);
-        }
+    unsafe fn release(_token: u8) {
+        core::arch::asm!("wsr.ps {0}", in(reg) VPS)
     }
 }
