@@ -2,16 +2,13 @@
 #![no_main]
 #![feature(type_alias_impl_trait)]
 
-use core::{cell::RefCell, fmt::Write};
-
 use embassy::{
     self,
-    blocking_mutex::CriticalSectionMutex as Mutex,
-    executor::{Executor, InterruptExecutor},
+    executor::Executor,
     time::{Duration, Timer},
     util::Forever,
 };
-use esp32c3_hal::{pac::UART0, prelude::*, RtcCntl, Serial, Timer as EspTimer};
+use esp32c3_hal::{prelude::*, RtcCntl, Timer as EspTimer};
 use panic_halt as _;
 
 #[embassy::task]
@@ -50,6 +47,4 @@ fn main() -> ! {
         spawner.spawn(run_low()).ok();
         spawner.spawn(run2()).ok();
     });
-
-    loop {}
 }

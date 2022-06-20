@@ -1,147 +1,20 @@
-use core::{
-    cell::Cell,
-    ptr,
-    sync::atomic::{compiler_fence, Ordering},
-}; // TODO use atomic polyfill here?
+use core::{cell::Cell, ptr}; // TODO use atomic polyfill here?
 
 use critical_section::CriticalSection;
 use embassy::{
     blocking_mutex::{raw::CriticalSectionRawMutex, CriticalSectionMutex as Mutex},
-    interrupt::{Interrupt, InterruptExt},
     time::driver::{AlarmHandle, Driver},
 };
 
 use crate::{
-    disable,
-    enable,
     interrupt,
     pac,
     pac::Peripherals,
-    set_priority,
     systimer::{Alarm, SystemTimer, Target},
     Cpu,
     CpuInterrupt,
     Priority,
 };
-
-pub unsafe trait PeripheralInterrupt {
-    fn peripheral_number(&self) -> u16;
-}
-
-macro_rules! embassy_interrupt {
-    (
-        $(($struct:ident, $interrupt:ident, $cpu:ident, $handler:tt)),*
-    ) => {
-        $(
-        pub struct $struct(crate::pac::Interrupt, CpuInterrupt);
-
-        unsafe impl Interrupt for $struct {
-            type Priority = Priority;
-
-            fn number(&self) -> u16 {
-                self.1 as _
-            }
-
-            unsafe fn steal() -> Self {
-                $struct(crate::pac::Interrupt::$interrupt, CpuInterrupt::$cpu)
-            }
-
-            unsafe fn __handler(&self) -> &'static embassy::interrupt::Handler {
-                #[export_name = $handler]
-                static HANDLER: ::embassy::interrupt::Handler = ::embassy::interrupt::Handler::new();
-                &HANDLER
-            }
-        }
-
-        unsafe impl PeripheralInterrupt for $struct {
-            fn peripheral_number(&self) -> u16 {
-                self.0 as _
-            }
-        }
-
-        unsafe impl ::embassy::util::Unborrow for $struct {
-            type Target = $struct;
-            unsafe fn unborrow(self) -> $struct {
-                self
-            }
-        }
-
-        impl InterruptExt for $struct {
-            fn set_handler(&self, func: unsafe fn(*mut ())) {
-                compiler_fence(Ordering::SeqCst);
-                let handler = unsafe { self.__handler() };
-                handler.func.store(func as *mut (), Ordering::Relaxed);
-                compiler_fence(Ordering::SeqCst);
-            }
-
-            fn remove_handler(&self) {
-                compiler_fence(Ordering::SeqCst);
-                let handler = unsafe { self.__handler() };
-                handler.func.store(ptr::null_mut(), Ordering::Relaxed);
-                compiler_fence(Ordering::SeqCst);
-            }
-
-            fn set_handler_context(&self, ctx: *mut ()) {
-                let handler = unsafe { self.__handler() };
-                handler.ctx.store(ctx, Ordering::Relaxed);
-            }
-
-            fn enable(&self) {
-                compiler_fence(Ordering::SeqCst);
-                let s = unsafe { Self::steal() };
-                enable(
-                    Cpu::ProCpu, // TODO remove hardcode
-                    s.0,
-                    s.1,
-                );
-            }
-
-            fn disable(&self) {
-                let s = unsafe { Self::steal() };
-                disable(
-                    Cpu::ProCpu, // TODO remove hardcode
-                    s.0,
-                );
-                compiler_fence(Ordering::SeqCst);
-            }
-
-            fn is_active(&self) -> bool {
-                let cause = riscv::register::mcause::read().cause();
-                matches!(cause, riscv::register::mcause::Trap::Interrupt(_))
-            }
-
-            fn is_enabled(&self) -> bool {
-                // TODO check that peripheral interrupt is installed at cpu slot
-                esp32c3_interrupt_controller::is_enabled(self.1)
-            }
-
-            fn is_pending(&self) -> bool {
-                esp32c3_interrupt_controller::is_pending(self.1)
-            }
-
-            fn pend(&self) {
-                esp32c3_interrupt_controller::pend(self.0)
-            }
-
-            fn unpend(&self) {
-                esp32c3_interrupt_controller::unpend(self.0, self.1)
-            }
-
-            fn get_priority(&self) -> Self::Priority {
-                esp32c3_interrupt_controller::get_priority(self.1)
-            }
-
-            fn set_priority(&self, prio: Self::Priority) {
-                let s = unsafe { Self::steal() };
-                set_priority(Cpu::ProCpu, s.1, prio)
-            }
-        }
-        )+
-    };
-}
-
-// TODO this needs to be a proc macro that can take dynamic input from the user
-embassy_interrupt!((GpioInterrupt, GPIO, Interrupt1, "__ESP_HAL_GPIOINTERRUPT"));
 
 pub fn init() -> Peripherals {
     // Do this first, so that it panics if user is calling `init` a second time
@@ -343,6 +216,7 @@ impl Driver for EmbassyTimer {
 }
 
 mod esp32c3_interrupt_controller {
+    #![allow(unused)]
     use super::*;
     // esp32c3 specific items to be generalised one day
 
