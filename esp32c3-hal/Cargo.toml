@@ -32,9 +32,11 @@ r0           = "1.0"
 riscv        = "0.8"
 riscv-rt     = { version = "0.8", optional = true }
 void         = { version = "1.0", default-features = false }
-embassy = { path = "/home/mabez/development/rust/embedded/util/embassy/embassy", features=["nightly"] }
-critical-section = "0.2.7"
-esp-println = { git = "https://github.com/esp-rs/esp-println", features = ["esp32c3"]}
+
+[dependencies.embassy]
+git      = "https://github.com/embassy-rs/embassy"
+rev      = "e4fbfaf"
+features = ["nightly"]
 
 [dependencies.esp-hal-common]
 path     = "../esp-hal-common"
@@ -42,6 +44,7 @@ features = ["esp32c3"]
 
 [dev-dependencies]
 embedded-graphics = "0.7"
+esp-println       = { version = "0.1.0", features = ["esp32c3"]}
 panic-halt        = "0.2"
 ssd1306           = "0.7"
 smart-leds        = "0.3"
