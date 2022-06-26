@@ -43,8 +43,19 @@ PROVIDE(_mp_hook = default_mp_hook);
 */
 PROVIDE(_start_trap = default_start_trap);
 
+/* 
+*
+* TODO: implement like this?: https://github.com/tinygo-org/tinygo/pull/2087/files#diff-5e0ef7d7d1dd709abd128de75ac13515b01f92c3637a6487f872b4f9568c0aa6 
+* DROM then IROM, program header is read from physical flash address in bootloader
+*/
+
 SECTIONS
 {
+  .header : {
+    KEEP(*(.header));
+    KEEP(*(.header.text));
+  } > HEADER
+
   .text.dummy (NOLOAD) :
   {
     /* This section is intended to make _stext address work */

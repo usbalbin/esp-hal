@@ -33,6 +33,49 @@ pub use self::{gpio::IO, rtc_cntl::RtcCntl};
 pub mod gpio;
 pub mod rtc_cntl;
 
+// #[cfg(not(feature = "direct-boot"))]
+mod header {
+    // 0x42000020 TODO can we get the linker to fill this in for us?
+    #[used]
+    #[link_section = ".header"]
+    static mut HEADER: [u8; 32] = [
+        0xE9,
+        1,
+        0,
+        0b0011_1111,
+        (0x42000020 >> 24) as u8,
+        (0x42000020 >> 16) as u8,
+        (0x42000020 >> 8) as u8,
+        (0x42000020 & 0xFF) as u8,
+        // END OF COMMON HEADER
+        0,
+        0,
+        0,
+        0,
+        5, // chip id esp32c3
+        0, // chip id esp32c3
+        0, // min rev
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0, // don't append digest
+        // END OF EXTENDED HEADER
+        0,
+        0,
+        0,
+        0,
+        0x40,
+        0xFF,
+        0x0,
+        0x0, // END OF SEGMENT META
+    ];
+}
+
 extern "C" {
     // Boundaries of the .iram section
     static mut _srwtext: u32;

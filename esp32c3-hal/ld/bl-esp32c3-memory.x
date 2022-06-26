@@ -23,6 +23,7 @@ MEMORY
     
 
     /* External flash */
+    HEADER : ORIGIN = 0x42000000,  LENGTH = 0x20
     /* Instruction ROM */
     IROM : ORIGIN =   0x42000000 + 0x20, LENGTH = 0x400000 - 0x20
     /* Data ROM */
