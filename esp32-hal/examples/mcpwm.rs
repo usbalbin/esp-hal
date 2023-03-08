@@ -33,6 +33,7 @@ fn main() -> ! {
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
     let pin = io.pins.gpio4;
+    let other_pin = io.pins.gpio5;
 
     // initialize peripheral
     let clock_cfg = PeripheralClockConfig::with_frequency(&clocks, 40u32.MHz()).unwrap();
@@ -49,6 +50,10 @@ fn main() -> ! {
         .operator0
         .with_pin_a(pin, PwmPinConfig::UP_ACTIVE_HIGH);
 
+    let mut other_pwm_pin = mcpwm
+        .operator0
+        .with_pin_a(other_pin, PwmPinConfig::UP_ACTIVE_HIGH);
+
     // start timer with timestamp values in the range of 0..=99 and a frequency of
     // 20 kHz
     let timer_clock_cfg = clock_cfg
@@ -58,6 +63,8 @@ fn main() -> ! {
 
     // pin will be high 50% of the time
     pwm_pin.set_timestamp(50);
+
+    other_pwm_pin.set_timestamp(1);
 
     loop {}
 }
